@@ -7,12 +7,12 @@
 using namespace std;
 
 int main() {
-  ios::sync_with_stdio(false);
+  ios::sync_with_stdio(0);
   cin.tie(nullptr);
 
   int n;
   if (!(cin >> n)) return 0;
-  vector<long long> P(n + 2);
+  vector<unsigned long long> P(n + 2);
   vector<char> C(n + 2);
   P[0] = P[n+1] = 1;
   C[0] = C[n+1] = 'T';
@@ -28,7 +28,7 @@ int main() {
       if (x=='P') return 0;
       if (x=='N') return 1;
       if (x=='A') return 2;
-      return 3; // B
+      return 3;
     };
     ra = idx(a); rb = idx(b);
     static const int T[4][4] = {
@@ -41,8 +41,7 @@ int main() {
   };
 
   int N = n + 2;
-  const long long NEG = LLONG_MIN / 4;
-  vector<vector<long long>> dp(N, vector<long long>(N, NEG));
+  vector<vector<long long>> dp(N, vector<long long>(N, 0));
   vector<vector<vector<int>>> seq(N, vector<vector<int>>(N));
 
   for (int i = 0; i < N; ++i) {
@@ -53,7 +52,7 @@ int main() {
   for (int len = 2; len < N; ++len) {
     for (int l = 0; l + len < N; ++l) {
       int r = l + len;
-      long long best = NEG;
+      long long best = 0;
       vector<int> bestSeq;
       for (int k = l + 1; k <= r - 1; ++k) {
         long long gain = P[l] * Af(C[l], C[k]) * P[k] + P[k] * Af(C[k], C[r]) * P[r];
@@ -68,7 +67,7 @@ int main() {
           bestSeq = move(candSeq);
         }
       }
-      if (best != NEG) {
+      if (best != 0) {
         dp[l][r] = best;
         seq[l][r] = move(bestSeq);
       }
