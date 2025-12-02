@@ -3,12 +3,13 @@
 #include <string>
 #include <climits>
 #include <algorithm>
+#include <functional>
 
 using namespace std;
 
 int main() {
   ios::sync_with_stdio(0);
-  cin.tie(nullptr);
+  cin.tie(0);
 
   int n;
   if (!(cin >> n)) return 0;
@@ -17,68 +18,96 @@ int main() {
   P[0] = P[n+1] = 1;
   C[0] = C[n+1] = 'T';
 
-  for (int i = 1; i <= n; ++i) cin >> P[i];
-  string s; cin >> s;
+  for (int i = 1; i <= n; ++i) {
+    if (!(cin >> P[i])) {
+      return 0;
+    }
+  }
+  string s;
+  if (!(cin >> s)) return 0;
+  if ((int)s.size() != n) return 0;
   for (int i = 1; i <= n; ++i) C[i] = s[i-1];
 
-  auto Af = [&](char a, char b) -> long long {
-    if (a == 'T' || b == 'T') return 1;
-    int ra, rb;
-    auto idx = [&](char x)->int{
-      if (x=='P') return 0;
-      if (x=='N') return 1;
-      if (x=='A') return 2;
-      return 3;
-    };
-    ra = idx(a); rb = idx(b);
-    static const int T[4][4] = {
-      {1,3,1,3},
-      {5,1,0,1},
-      {0,1,0,4},
-      {1,3,2,3}
-    };
-    return T[ra][rb];
+  int N = n + 2;
+  vector<int> type(N);
+  auto mapChar = [](char x)->int {
+    if (x == 'P') return 0;
+    if (x == 'N') return 1;
+    if (x == 'A') return 2;
+    if (x == 'B') return 3;
+    return 4;
+  };
+  for (int i = 0; i < N; ++i) type[i] = mapChar(C[i]);
+
+  static const int AfTable[5][5] = {
+    {1,3,1,3,1},
+    {5,1,0,1,1},
+    {0,1,0,4,1},
+    {1,3,2,3,1},
+    {1,1,1,1,1}
   };
 
-  int N = n + 2;
-  vector<vector<long long>> dp(N, vector<long long>(N, 0));
-  vector<vector<vector<int>>> seq(N, vector<vector<int>>(N));
+  auto Af = [&](int a, int b)->int { return AfTable[a][b]; };
 
-  for (int i = 0; i < N; ++i) {
-    dp[i][i] = 0;
-    if (i+1 < N) dp[i][i+1] = 0;
-  }
+  auto idx = [&](int l, int r)->size_t { return (size_t)l * (size_t)N + (size_t)r; };
+  vector<unsigned long long> dp((size_t)N * N, 0);
+  vector<int> parent((size_t)N * N, -1);
+
+  function<void(int,int,vector<int>&)> collect = [&](int l, int r, vector<int> &out) {
+    int p = parent[idx(l,r)];
+    if (p == -1) return;
+    collect(l, p, out);
+    collect(p, r, out);
+    out.push_back(p);
+  };
 
   for (int len = 2; len < N; ++len) {
     for (int l = 0; l + len < N; ++l) {
       int r = l + len;
-      long long best = 0;
-      vector<int> bestSeq;
+      unsigned long long best = 0;
+      int bestK = -1;
       for (int k = l + 1; k <= r - 1; ++k) {
-        long long gain = P[l] * Af(C[l], C[k]) * P[k] + P[k] * Af(C[k], C[r]) * P[r];
-        long long candVal = dp[l][k] + dp[k][r] + gain;
-        vector<int> candSeq;
-        candSeq.reserve((int)seq[l][k].size() + (int)seq[k][r].size() + 1);
-        candSeq.insert(candSeq.end(), seq[l][k].begin(), seq[l][k].end());
-        candSeq.insert(candSeq.end(), seq[k][r].begin(), seq[k][r].end());
-        candSeq.push_back(k);
-        if (candVal > best || (candVal == best && candSeq < bestSeq)) {
-          best = candVal;
-          bestSeq = move(candSeq);
+        __int128 g1 = (__int128)P[l] * Af(type[l], type[k]) * (__int128)P[k];
+        __int128 g2 = (__int128)P[k] * Af(type[k], type[r]) * (__int128)P[r];
+        unsigned long long gain = (unsigned long long)(g1 + g2);
+
+        unsigned long long cand = dp[idx(l,k)] + dp[idx(k,r)] + gain;
+
+        if (cand > best) {
+          best = cand;
+          bestK = k;
+        } else if (cand == best) {
+          vector<int> candSeq;
+          candSeq.reserve(len - 1);
+          collect(l, k, candSeq);
+          collect(k, r, candSeq);
+          candSeq.push_back(k);
+
+          if (bestK == -1) {
+            bestK = k;
+          } else {
+            vector<int> curBestSeq;
+            curBestSeq.reserve(len - 1);
+            collect(l, bestK, curBestSeq);
+            collect(bestK, r, curBestSeq);
+            curBestSeq.push_back(bestK);
+            if (candSeq < curBestSeq) bestK = k;
+          }
         }
       }
-      if (best != 0) {
-        dp[l][r] = best;
-        seq[l][r] = move(bestSeq);
-      }
+      dp[idx(l,r)] = best;
+      parent[idx(l,r)] = bestK;
     }
   }
 
-  long long result = dp[0][n+1];
+  unsigned long long result = dp[idx(0, n+1)];
   cout << result << "\n";
-  for (size_t i = 0; i < seq[0][n+1].size(); ++i) {
+  vector<int> out;
+  out.reserve(n);
+  collect(0, n+1, out);
+  for (size_t i = 0; i < out.size(); ++i) {
     if (i) cout << ' ';
-    cout << seq[0][n+1][i];
+    cout << out[i];
   }
   cout << "\n";
   return 0;
